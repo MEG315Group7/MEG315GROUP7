@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AD-HTC Fuel-Enhanced Gas Power Cycle Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .metric-card { transition: all 0.3s ease; }
+        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        .tab-active { border-bottom: 2px solid #667eea; color: #667eea; font-weight: 600; }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        .error-message { background: #fee2e2; border-left: 4px solid #dc2626; color: #991b1b; padding: 1rem; margin: 1rem 0; border-radius: 4px; }
+        .success-message { background: #d1fae5; border-left: 4px solid #059669; color: #065f46; padding: 1rem; margin: 1rem 0; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <div>
+                        <h1 class="text-2xl font-bold">AD-HTC Power Cycle</h1>
+                        <p class="text-sm opacity-90">Anaerobic Digestion - Hydrothermal Carbonization Integration</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="connection-status" class="flex items-center text-sm">
+                        <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                        Connected
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-6 py-6">
+        
+        <!-- Messages -->
+        <div id="message-container"></div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex space-x-6 mb-6 border-b border-gray-200 bg-white rounded-t-lg px-4">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-active py-4 px-2 transition">Dashboard</button>
+            <button onclick="switchTab('parameters')" id="tab-parameters" class="py-4 px-2 text-gray-500 hover:text-gray-700 transition">Parameters</button>
+            <button onclick="switchTab('thermodynamics')" id="tab-thermodynamics" class="py-4 px-2 text-gray-500 hover:text-gray-700 transition">Thermodynamic Charts</button>
+            <button onclick="switchTab('scenarios')" id="tab-scenarios" class="py-4 px-2 text-gray-500 hover:text-gray-700 transition">Scenarios</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="space-y-6">
+            
+            <!-- Control Bar -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center space-x-4">
+                    <select id="quick-scenario" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500" onchange="loadQuickScenario()">
+                        <option value="">Quick Load Scenario...</option>
+                        <option value="base_case">Base Case</option>
+                        <option value="optimized">Optimized</option>
+                        <option value="full_cogas">Full COGAS</option>
+                        <option value="minimal_config">Minimal Config</option>
+                        <option value="high_efficiency">High Efficiency</option>
+                    </select>
+                    <button onclick="runCalculation()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2" id="calc-btn">
+                        <span id="calc-spinner" class="loading-spinner hidden"></span>
+                        <span id="calc-text">Run Calculation</span>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="exportResults()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">Export JSON</button>
+                    <button onclick="window.print()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">Print Report</button>
+                </div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="metric-card bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Net Power Output</p>
+                            <p class="text-3xl font-bold text-gray-800" id="metric-power">--</p>
+                            <p class="text-xs text-gray-400 mt-1">kW</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">System Efficiency</p>
+                            <p class="text-3xl font-bold text-gray-800" id="metric-efficiency">--</p>
+                            <p class="text-xs text-gray-400 mt-1">%</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Biogas Production</p>
+                            <p class="text-3xl font-bold text-gray-800" id="metric-biogas">--</p>
+                            <p class="text-xs text-gray-400 mt-1">m³/day</p>
+                        </div>
+                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Self-Sufficiency</p>
+                            <p class="text-3xl font-bold text-gray-800" id="metric-sufficiency">--</p>
+                            <p class="text-xs text-gray-400 mt-1">%</p>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Results -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold mb-4">Gas Turbine Performance</h3>
+                    <div class="space-y-3 text-sm" id="gt-results">
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Thermal Efficiency</span>
+                            <span class="font-medium" id="gt-efficiency">--</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Net Work Output</span>
+                            <span class="font-medium" id="gt-work">--</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Turbine Exit Temperature</span>
+                            <span class="font-medium" id="gt-temp">--</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Pressure Ratio</span>
+                            <span class="font-medium" id="gt-pressure">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold mb-4">AD & HTC Systems</h3>
+                    <div class="space-y-3 text-sm" id="bio-results">
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Biogas Energy Output</span>
+                            <span class="font-medium" id="ad-energy">--</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Methane Production</span>
+                            <span class="font-medium" id="ad-methane">--</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Hydrochar Yield</span>
+                            <span class="font-medium" id="htc-yield">--</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Heat Integration</span>
+                            <span class="font-medium" id="htc-heat">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Energy Flow Chart -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-lg font-semibold mb-4">Energy Flow Distribution</h3>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="energyFlowChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parameters Tab -->
+        <div id="parameters" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Gas Turbine Parameters -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Gas Turbine Parameters
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ambient Temperature (K)</label>
+                            <input type="number" id="param-ambient-temp" value="298.15" step="0.1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 273-323 K</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Pressure Ratio</label>
+                            <input type="number" id="param-pressure-ratio" value="12.0" step="0.5" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 3-25</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Max Turbine Temperature (K)</label>
+                            <input type="number" id="param-turbine-temp" value="1400.0" step="10" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 800-1600 K</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Compressor Efficiency</label>
+                            <input type="number" id="param-comp-eff" value="0.85" step="0.01" min="0.75" max="0.95" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 0.75-0.95</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Turbine Efficiency</label>
+                            <input type="number" id="param-turb-eff" value="0.88" step="0.01" min="0.80" max="0.95" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 0.80-0.95</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AD & HTC Parameters -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                        </svg>
+                        AD & HTC Parameters
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">AD Feedstock Rate (kg/day)</label>
+                            <input type="number" id="param-feedstock" value="3000.0" step="100" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 1000-10000 kg/day</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">AD Retention Time (days)</label>
+                            <input type="number" id="param-retention" value="20.0" step="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 10-40 days</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">HTC Biomass Rate (kg/day)</label>
+                            <input type="number" id="param-htc-biomass" value="500.0" step="50" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 100-2000 kg/day</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">HTC Temperature (K)</label>
+                            <input type="number" id="param-htc-temp" value="473.0" step="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Range: 423-573 K (150-300°C)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-center space-x-4">
+                <button onclick="runCalculation()" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2 shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h

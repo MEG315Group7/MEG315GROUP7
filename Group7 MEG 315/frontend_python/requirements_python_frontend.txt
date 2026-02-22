@@ -1,0 +1,9 @@
+# Python Frontend Requirements for AD-HTC System
+# Install with: pip install -r requirements_python_frontend.txt
+
+tkinter; python_version >= "3.0"  # Usually comes with Python
+matplotlib>=3.3.0
+numpy>=1.19.0
+requests>=2.25.0
+pillow>=8.0.0  # For image support
+scipy>=1.6.0   # For advanced calculations
