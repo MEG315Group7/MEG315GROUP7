@@ -561,4 +561,4 @@ if st.button("🔍 RUN THERMODYNAMIC ANALYSIS", type="primary"):
          brayton_states, rankine_states, 
          m_total, m_steam, pinch_temp
      )
-     st.pyplot(fig_c
+     st.pyplot(fig_c)
