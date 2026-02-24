@@ -561,4 +561,31 @@ if st.button("🔍 RUN THERMODYNAMIC ANALYSIS", type="primary"):
          brayton_states, rankine_states, 
          m_total, m_steam, pinch_temp
      )
-     st.pyplot(fig_c)
+     st.pyplot(fig_composite)
+  
+    # Exergy analysis
+     st.subheader("Exergy Destruction Analysis")
+     col1, col2 = st.columns(2)
+     
+     with col1:
+         st.markdown("**Component Exergy Destruction**")
+         for component, ex_dest in exergy_results.items():
+             st.write(f"• {component.capitalize()}: {ex_dest:.2f} kJ/kg")
+     
+     with col2:
+         st.markdown("**Exergy Efficiency**")
+         ex_eff = 1 - sum(exergy_results.values()) / (m_fuel * biogas_lhv / m_total) if m_total > 0 else 0
+         st.write(f"• Second Law Efficiency: {ex_eff:.1%}")
+         st.write(f"• Total Destruction: {sum(exergy_results.values()):.2f} kJ/kg")
+     
+     # Sankey diagram option
+     st.subheader("Energy Flow Diagram")
+     st.info("Sankey diagram visualization would go here - showing energy flows from fuel input through both cycles to power output and losses")
+     
+ except Exception as e:
+     st.error(f"Calculation error: {str(e)}")
+     st.exception(e)
+
+# Footer
+st.markdown("---")
+st.markdown("*AD-HTC Integrated System Analysis Tool | MEG315 Group 7*")
