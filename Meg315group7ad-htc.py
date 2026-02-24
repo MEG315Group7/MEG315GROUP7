@@ -525,4 +525,4 @@ if st.button("🔍 RUN THERMODYNAMIC ANALYSIS", type="primary"):
                 'Point': [s.point_name for s in brayton_states],
                 'P (bar)': [f"{s.p:.2f}" for s in brayton_states],
                 'T (K)': [f"{s.T:.1f}" for s in brayton_states],
-                'h (kJ/kg)': [f"{s.h:.1f}" for 
+                'h (kJ/kg)': [f"{s.h:.1f}"] for 
